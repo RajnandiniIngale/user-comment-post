@@ -471,8 +471,30 @@ builder.queryType({
                     }
                 })
             }
-        })
+        }),
 
+        getPostsByPublishedDateRange: t.prismaConnection({
+            type: "Post",
+            cursor: "id",
+            nullable: true,
+            args: {
+                startDateArgs: t.arg.string({ required: true }),
+                endDateArgs: t.arg.string({ required: true })
+            },
+            resolve: async (query, _, args) => {
+                const startDate = new Date(args.startDateArgs);
+                const endDate = new Date(args.endDateArgs);
+
+                return db.post.findMany({
+                    where: {
+                        publishedAt: {
+                            gte: startDate,
+                            lte: endDate
+                        }
+                    }
+                })
+            }
+        })
 
     }),
 }),
@@ -806,35 +828,6 @@ builder.relayMutationField("deleteUserById",
         }),
 
 
-    // builder.relayMutationFid("updateUser", {
-    //     inputFields: (t) => ({
-    //       id: t.int({ required: true }),
-    //       name: t.string({ required: false }), // Make name field optional
-    //       email: t.string({ required: false }),
-    //       bio: t.string({ required: false }),
-    //       birthDate: t.field({ type: "Date", required: false }),
-    //       isActive: t.boolean({ required: false }),
-    //       address: t.field({ type: "Json", required: false }),
-    //       profilePic: t.field({ type: "Bytes", required: false }),
-    //     }),
-    // },
-    // {
-    //     resolve: async (_, args) => {
-
-    //         const { id, name, email } = args.input;
-
-    //         const updateData: any = {};
-    // if (name !== null) updateData.name = name;
-    // if (email !== null) updateData.email = email;
-    //       const result = await db.user.update({
-    //         where: { id: args.input.id },
-    //         data: updateData
-    //       });
-    //       return result;
-    //     }
-    //     },{
-    //     outputFields: (t) => ({}),
-    //   }),
 
     builder.relayMutationField("updatePost",
         {
@@ -897,35 +890,121 @@ builder.relayMutationField("deleteUserById",
         {
             inputFields: t => ({
                 id: t.int({ required: true }),
-                content: t.field({
-                    type: "Json",
-                    required: false
-                }),
-                authorId: t.int({ required: false }),
-                postId: t.int({ required: false })
+                content: t.string({ required: false }),
+                postId: t.int({ required: false }),
+                authorId: t.int({ required: false })
             })
         },
         {
             resolve: async (_, args) => {
+                // Fetch the existing comment
+
+                const { id, ...inputData } = args.input;
+
+                const existingComment = await db.comment.findUnique({
+                    where: {
+                        id: args.input.id
+                    }
+                });
+
+                if (!existingComment) {
+                    throw new Error("Comment not found");
+                }
+
+                const updatedData: any = {
+                    content: args.input.content,
+                    postId: args.input.content === undefined ? existingComment.postId : args.input.postId,
+                    authorId: args.input.authorId === undefined ? existingComment.authorId : args.input.authorId
+                }
                 const result = await db.comment.update({
                     where: {
                         id: args.input.id
                     },
-                    data: {
-                        content: args.input.content,
-                        authorId: args.input.authorId || undefined,
-                        postId: args.input.postId || undefined
+                    data: updatedData
+
+                });
+
+                console.log("Comment updated: ", result);
+
+                return { status: true, id: result.id };
+            }
+        },
+        {
+            outputFields: t => ({
+                success: t.boolean({
+                    resolve: (result) => result.status
+                }),
+                id: t.int({
+                    resolve: (result) => result.id
+                })
+            })
+        }
+    ),
+
+
+    builder.relayMutationField("updateUser",
+        {
+            inputFields: t => ({
+                id: t.int({ required: true }),
+                name: t.string({ required: false }),
+                email: t.string({ required: false }),
+                bio: t.string({ required: false }),
+                birthDate: t.field({
+                    type: "Date",
+                    required: false
+                }),
+                isActive: t.boolean({ required: false }),
+                address: t.field({
+                    type: "Json",
+                    required: false
+                }),
+                profilePic: t.field({
+                    type: "Bytes",
+                    required: false
+                })
+            })
+        },
+        {
+            resolve: async (_, args) => {
+                const { id, ...inputData } = args.input;
+
+                const existingUser = await db.user.findUnique({
+                    where: {
+                        id: args.input.id
                     }
                 })
 
 
-                console.log("Comment updated: ", result);
+                if (!existingUser) {
+                    throw new Error("User not found");
+                }
+
+
+                const updatedData: any = {
+                    name: args.input.name === undefined ? existingUser.name : args.input.name,
+                    email: args.input.email === undefined ? existingUser.email : args.input.email,
+                    bio: args.input.bio === undefined ? existingUser.bio : args.input.bio,
+                    birthDate: args.input.birthDate === undefined ? existingUser.birthDate : args.input.birthDate,
+                    isActive: args.input.isActive === undefined ? existingUser.isActive : args.input.isActive,
+                    address: args.input.address === undefined ? existingUser.address : args.input.address,
+                    profilePic: args.input.profilePic === undefined ? existingUser.profilePic : args.input.profilePic,
+                }
+
+
+                const result = await db.user.update({
+                    where: {
+                        id: args.input.id
+                    },
+                    data: updatedData
+                })
+
+                console.log("Updated User: ", result);
 
                 return { status: true, id: result.id }
             }
         },
         {
-            outputFields: t => ({
+            outputFields: (t) => ({
 
                 success: t.boolean({
                     resolve: (result) => result.status
@@ -936,6 +1015,7 @@ builder.relayMutationField("deleteUserById",
                 })
             })
         })
+
 
 builder.mutationType({
     fields: t => ({})
