@@ -415,25 +415,6 @@ builder.queryType({
 
         }),
 
-
-        getPostsWithSpecificTag: t.prismaConnection({
-            type: "Post",
-            nullable: true,
-            cursor: "id",
-            args: {
-                tag: t.arg.string({ required: true })
-            },
-            resolve: async (query, _root, args) => db.post.findMany({
-                ...query,
-                where: {
-                    tags: {
-                        has: args.tag
-                    }
-                }
-            })
-        }),
-
-
         getUsersWithProfilePics: t.prismaConnection({
             type: "User",
             cursor: "id",
@@ -486,6 +467,7 @@ builder.queryType({
                 const endDate = new Date(args.endDateArgs);
 
                 return db.post.findMany({
+                    ...query,
                     where: {
                         publishedAt: {
                             gte: startDate,
@@ -494,6 +476,56 @@ builder.queryType({
                     }
                 })
             }
+        }),
+
+        getPostsWithAtleastOneTag: t.prismaConnection({
+            type: "Post",
+            nullable: true,
+            cursor: "id",
+            args: {
+                tags: t.arg.stringList({ required: true })
+            },
+            resolve: async (query, _, args) => db.post.findMany({
+                where: {
+                    tags: {
+                        hasSome: args.tags
+                    }
+                }
+            })
+        }),
+
+
+        getPostsWithEveryTag: t.prismaConnection({
+            type: "Post",
+            cursor: "id",
+            nullable: true,
+            args: {
+                tags: t.arg.stringList({ required: true })
+            },
+            resolve: async (query, _, args) => db.post.findMany({
+                where: {
+                    tags: {
+                        hasEvery: args.tags
+                    }
+                }
+            })
+        }),
+
+        getPostsWithSpecificTag: t.prismaConnection({
+            type: "Post",
+            cursor: "id",
+            args: {
+                tag: t.arg.string({ required: true })
+            },
+            nullable: true,
+            resolve: async (query, _, args) => db.post.findMany({
+                ...query,
+                where: {
+                    tags: {
+                        has: args.tag
+                    }
+                }
+            })
         })
 
     }),
@@ -1014,8 +1046,87 @@ builder.relayMutationField("deleteUserById",
                     resolve: (result) => result.id
                 })
             })
-        })
+        }),
 
+    builder.relayMutationField("incrementUpvotes",
+        {
+            inputFields: t => ({
+                id: t.int({ required: true })
+            })
+        },
+        {
+            resolve: async (_, args) => {
+                const result = await db.post.update({
+                    where: {
+                        id: args.input.id
+                    },
+                    data: {
+                        upvotes: {
+                            increment: 1
+                        }
+                    }
+                })
+
+                console.log("Upvotes incremented by 1");
+
+                return { status: true, upvotes: result.upvotes, id: result.id }
+            }
+        },
+        {
+            outputFields: t => ({
+
+                success: t.boolean({
+                    resolve: (result) => result.status
+                }),
+
+                id: t.int({
+                    resolve: (result) => result.id
+                }),
+
+                upvotes: t.int({
+                    resolve: (result) => Number(result.upvotes)
+                })
+            })
+        }),
+
+    builder.relayMutationField("addTagToPost",
+        {
+            inputFields: t => ({
+                id: t.int({ required: true }),
+                tag: t.string({ required: true })
+            })
+        },
+        {
+            resolve: async (_, args) => {
+
+                const result = await db.post.update({
+                    where: {
+                        id: args.input.id
+                    },
+                    data: {
+                        tags: {
+                            push: args.input.tag
+                        }
+                    }
+                })
+
+                return { status: true, id: result.id, tags: result.tags }
+            }
+        },
+        {
+            outputFields: (t) => ({
+                success: t.boolean({
+                    resolve: (res) => res.status
+                }),
+                tags: t.stringList({
+                    resolve: (res) => res.tags
+                }),
+
+                id: t.int({
+                    resolve: (res) => res.id
+                })
+            })
+        })
 
 builder.mutationType({
     fields: t => ({})
