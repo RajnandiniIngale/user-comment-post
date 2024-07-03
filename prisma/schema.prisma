@@ -16,8 +16,9 @@ datasource db {
 
 model User {
   id         Int       @id @default(autoincrement())
-  name       String
+  name       String?
   email      String    @unique
+  password   String
   bio        String?
   birthDate  DateTime?
   isActive   Boolean?  @default(true)
@@ -31,10 +32,10 @@ model User {
 
 model Post {
   id          Int       @id @default(autoincrement())
-  title       String
+  title       String?
   content     Json?
   tags        String[]
-  upvotes     Int       @default(0)
+  upvotes     Int?       @default(0)
   publishedAt DateTime?
   comment     Comment[]
   authorId    Int
