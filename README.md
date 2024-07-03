@@ -6,7 +6,9 @@ This method is even more concise and achieves the same result: only updating the
 The key here is that Prisma's update operation is designed to only update the fields that are explicitly provided. If a field is undefined, Prisma will ignore it and not update that field in the database.
 This approach is not only more concise but also more flexible. If you add new fields to your Comment model in the future, you won't need to modify this mutation - it will automatically handle any new fields provided in the input.
 
-`builder.relayMutationField("updateComment", {
+`
+
+builder.relayMutationField("updateComment", {
   inputFields: t => ({
     id: t.int({ required: true }),
     content: t.field({ type: "Json", required: false }),
@@ -37,4 +39,5 @@ This approach is not only more concise but also more flexible. If you add new fi
     })
   })
 });
+
 `
